@@ -1,5 +1,6 @@
 package com.mywallet.bank.application.service;
 
+import com.mywallet.bank.application.command.AdminAuditCommand;
 import com.mywallet.bank.application.command.OperationCommand;
 import com.mywallet.bank.application.exception.AccountNotFoundException;
 import com.mywallet.bank.application.exception.IdempotencyConflictException;
@@ -9,6 +10,7 @@ import com.mywallet.bank.domain.model.BankAccount;
 import com.mywallet.bank.domain.model.BankOperation;
 import com.mywallet.bank.domain.model.OperationType;
 import com.mywallet.bank.domain.port.AccountRepository;
+import com.mywallet.bank.domain.port.AuditLogRepository;
 import com.mywallet.bank.domain.port.OperationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,11 +23,18 @@ public class OperationExecutor {
 
 	private final AccountRepository accounts;
 	private final OperationRepository operations;
+	private final AuditLogRepository auditLog;
 	private final Clock clock;
 
-	public OperationExecutor(AccountRepository accounts, OperationRepository operations, Clock clock) {
+	public OperationExecutor(
+			AccountRepository accounts,
+			OperationRepository operations,
+			AuditLogRepository auditLog,
+			Clock clock
+	) {
 		this.accounts = accounts;
 		this.operations = operations;
+		this.auditLog = auditLog;
 		this.clock = clock;
 	}
 
@@ -35,6 +44,11 @@ public class OperationExecutor {
 	 */
 	@Transactional
 	public OperationResult execute(OperationCommand command, OperationType type) {
+		return execute(command, type, null);
+	}
+
+	@Transactional
+	public OperationResult execute(OperationCommand command, OperationType type, AdminAuditCommand audit) {
 		if (type == null) {
 			throw new IllegalArgumentException("Le type d'opération est obligatoire");
 		}
@@ -68,6 +82,9 @@ public class OperationExecutor {
 				);
 				operations.save(operation);
 				accounts.save(account);
+				if (audit != null) {
+					Audits.append(auditLog, audit, clock);
+				}
 				yield OperationResults.from(operation);
 			}
 			case AccountMovementResult.Rejected rejected -> {

@@ -35,7 +35,7 @@ class OperationExecutorTest {
 	void setUp() {
 		accounts = new InMemoryAccountRepository();
 		operations = new InMemoryOperationRepository();
-		executor = new OperationExecutor(accounts, operations, CLOCK);
+		executor = new OperationExecutor(accounts, operations, new InMemoryAuditLogRepository(), CLOCK);
 	}
 
 	@Test

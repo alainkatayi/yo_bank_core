@@ -1,16 +1,17 @@
 package com.mywallet.bank.application.service;
 
+import com.mywallet.bank.application.command.OpenAccountCommand;
 import com.mywallet.bank.application.exception.CustomerNotFoundException;
+import com.mywallet.bank.application.exception.CustomerSuspendedException;
 import com.mywallet.bank.application.port.in.OpenAccountUseCase;
 import com.mywallet.bank.application.result.AccountView;
 import com.mywallet.bank.domain.model.AccountNumber;
 import com.mywallet.bank.domain.model.Customer;
+import com.mywallet.bank.domain.model.CustomerStatus;
 import com.mywallet.bank.domain.port.CustomerRepository;
-
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
-import java.util.UUID;
 
 /**
  * Ne jamais appeler ce bean depuis une transaction déjà ouverte.
@@ -33,15 +34,21 @@ public class OpenAccountService implements OpenAccountUseCase {
 	}
 
 	@Override
-	public AccountView execute(UUID customerId) {
-		if (customerId == null) {
-			throw new IllegalArgumentException("L'identifiant client est obligatoire");
+	public AccountView execute(OpenAccountCommand command) {
+		if (command == null) {
+			throw new IllegalArgumentException("La commande est obligatoire");
 		}
-		Customer customer = customers.findById(customerId)
+		Customer customer = customers.findById(command.customerId())
 				.orElseThrow(CustomerNotFoundException::new);
+		if (customer.getStatus() != CustomerStatus.ACTIVE) {
+			throw new CustomerSuspendedException();
+		}
 		for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
 			try {
-				return AccountViews.from(opener.open(customer.getId(), nextAccountNumber()), customer);
+				return AccountViews.from(
+						opener.open(customer.getId(), nextAccountNumber(), command.actor()),
+						customer
+				);
 			} catch (AccountNumberTakenException ignored) {
 				// Une autre création a pris ce numéro : on en tire un autre.
 			}

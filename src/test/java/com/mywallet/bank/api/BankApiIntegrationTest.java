@@ -29,7 +29,7 @@ class BankApiIntegrationTest extends AbstractApplicationIntegrationTest {
 	@Test
 	void createsACustomerThenDepositsAndDebits() throws Exception {
 		Opened opened = openAccount();
-		String deposit = mockMvc.perform(post("/bank/admin/accounts/" + opened.accountNumber() + "/deposit")
+		String deposit = mockMvc.perform(post("/bank/admin/accounts/" + opened.accountNumber() + "/deposit").with(BankTokens.admin())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"amount":"100000.00"}
@@ -48,14 +48,14 @@ class BankApiIntegrationTest extends AbstractApplicationIntegrationTest {
 		String reference = "debit-" + UUID.randomUUID();
 		String debit = postOperation("/bank/operations/debit", reference, opened.accountNumber(), "30000.00");
 
-		mockMvc.perform(get("/bank/accounts/" + opened.accountNumber()))
+		mockMvc.perform(get("/bank/accounts/" + opened.accountNumber()).with(BankTokens.walletRead()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.accountNumber").value(opened.accountNumber()))
 				.andExpect(jsonPath("$.holderName").value("A*** K***"))
 				.andExpect(jsonPath("$.balance").value("70000.00"))
 				.andExpect(jsonPath("$.status").value("ACTIVE"));
 
-		String read = mockMvc.perform(get("/bank/operations/" + reference))
+		String read = mockMvc.perform(get("/bank/operations/" + reference).with(BankTokens.walletRead()))
 				.andExpect(status().isOk())
 				.andReturn()
 				.getResponse()
@@ -70,7 +70,7 @@ class BankApiIntegrationTest extends AbstractApplicationIntegrationTest {
 		Opened opened = openAccount();
 		String reference = "overdraft-" + UUID.randomUUID();
 
-		mockMvc.perform(post("/bank/operations/debit")
+		mockMvc.perform(post("/bank/operations/debit").with(BankTokens.walletDebit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(operationJson(reference, opened.accountNumber(), "10.00")))
 				.andExpect(status().isOk())
@@ -78,7 +78,7 @@ class BankApiIntegrationTest extends AbstractApplicationIntegrationTest {
 				.andExpect(jsonPath("$.rejectionReason").value("INSUFFICIENT_FUNDS"))
 				.andExpect(jsonPath("$.balanceAfter").doesNotExist());
 
-		mockMvc.perform(get("/bank/accounts/" + opened.accountNumber()))
+		mockMvc.perform(get("/bank/accounts/" + opened.accountNumber()).with(BankTokens.walletRead()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.balance").value("0.00"));
 	}
@@ -89,14 +89,14 @@ class BankApiIntegrationTest extends AbstractApplicationIntegrationTest {
 		String reference = "replay-" + UUID.randomUUID();
 		String body = operationJson(reference, opened.accountNumber(), "100.00");
 
-		String first = mockMvc.perform(post("/bank/operations/debit")
+		String first = mockMvc.perform(post("/bank/operations/debit").with(BankTokens.walletDebit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body))
 				.andExpect(status().isOk())
 				.andReturn()
 				.getResponse()
 				.getContentAsString();
-		String second = mockMvc.perform(post("/bank/operations/debit")
+		String second = mockMvc.perform(post("/bank/operations/debit").with(BankTokens.walletDebit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body))
 				.andExpect(status().isOk())
@@ -106,7 +106,7 @@ class BankApiIntegrationTest extends AbstractApplicationIntegrationTest {
 
 		assertThat(second).isEqualTo(first);
 		assertThat(countByReference(reference)).isEqualTo(1);
-		mockMvc.perform(get("/bank/accounts/" + opened.accountNumber()))
+		mockMvc.perform(get("/bank/accounts/" + opened.accountNumber()).with(BankTokens.walletRead()))
 				.andExpect(jsonPath("$.balance").value("900.00"));
 	}
 
@@ -116,21 +116,21 @@ class BankApiIntegrationTest extends AbstractApplicationIntegrationTest {
 		String reference = "conflict-" + UUID.randomUUID();
 		postOperation("/bank/operations/debit", reference, opened.accountNumber(), "100.00");
 
-		mockMvc.perform(post("/bank/operations/debit")
+		mockMvc.perform(post("/bank/operations/debit").with(BankTokens.walletDebit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(operationJson(reference, opened.accountNumber(), "200.00")))
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.code").value("IDEMPOTENCY_CONFLICT"));
 
 		assertThat(countByReference(reference)).isEqualTo(1);
-		mockMvc.perform(get("/bank/accounts/" + opened.accountNumber()))
+		mockMvc.perform(get("/bank/accounts/" + opened.accountNumber()).with(BankTokens.walletRead()))
 				.andExpect(jsonPath("$.balance").value("900.00"));
 	}
 
 	@Test
 	void persistsNothingWhenTheAccountIsUnknown() throws Exception {
 		String reference = "missing-" + UUID.randomUUID();
-		mockMvc.perform(post("/bank/operations/debit")
+		mockMvc.perform(post("/bank/operations/debit").with(BankTokens.walletDebit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(operationJson(reference, "999999999999", "10.00")))
 				.andExpect(status().isNotFound())
@@ -152,10 +152,19 @@ class BankApiIntegrationTest extends AbstractApplicationIntegrationTest {
 	}
 
 	@Test
+	void healthIsPublic() throws Exception {
+		int status = mockMvc.perform(get("/actuator/health"))
+				.andReturn()
+				.getResponse()
+				.getStatus();
+		assertThat(status).isNotIn(401, 403);
+	}
+
+	@Test
 	void rejectsADuplicatePhone() throws Exception {
 		String phone = nextPhone();
 		createCustomer(phone);
-		mockMvc.perform(post("/bank/admin/customers")
+		mockMvc.perform(post("/bank/admin/customers").with(BankTokens.admin())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(customerJson(phone)))
 				.andExpect(status().isConflict())
@@ -163,7 +172,7 @@ class BankApiIntegrationTest extends AbstractApplicationIntegrationTest {
 	}
 
 	private Opened fund(Opened opened, String amount) throws Exception {
-		mockMvc.perform(post("/bank/admin/accounts/" + opened.accountNumber() + "/deposit")
+		mockMvc.perform(post("/bank/admin/accounts/" + opened.accountNumber() + "/deposit").with(BankTokens.admin())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"amount":"%s"}
@@ -176,7 +185,7 @@ class BankApiIntegrationTest extends AbstractApplicationIntegrationTest {
 	private Opened openAccount() throws Exception {
 		String phone = nextPhone();
 		String customerId = createCustomer(phone);
-		MvcResult created = mockMvc.perform(post("/bank/admin/customers/" + customerId + "/accounts"))
+		MvcResult created = mockMvc.perform(post("/bank/admin/customers/" + customerId + "/accounts").with(BankTokens.admin()))
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.balance").value("0.00"))
 				.andExpect(jsonPath("$.status").value("ACTIVE"))
@@ -189,7 +198,7 @@ class BankApiIntegrationTest extends AbstractApplicationIntegrationTest {
 	}
 
 	private String createCustomer(String phone) throws Exception {
-		MvcResult created = mockMvc.perform(post("/bank/admin/customers")
+		MvcResult created = mockMvc.perform(post("/bank/admin/customers").with(BankTokens.admin())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(customerJson(phone)))
 				.andExpect(status().isCreated())
@@ -201,7 +210,7 @@ class BankApiIntegrationTest extends AbstractApplicationIntegrationTest {
 	}
 
 	private String postOperation(String path, String reference, String accountNumber, String amount) throws Exception {
-		return mockMvc.perform(post(path)
+		return mockMvc.perform(post(path).with(BankTokens.walletDebit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(operationJson(reference, accountNumber, amount)))
 				.andExpect(status().isOk())
@@ -211,7 +220,7 @@ class BankApiIntegrationTest extends AbstractApplicationIntegrationTest {
 	}
 
 	private String verify(String accountNumber, String phone) throws Exception {
-		return mockMvc.perform(post("/bank/links/verify")
+		return mockMvc.perform(post("/bank/links/verify").with(BankTokens.walletRead())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"accountNumber":"%s","phone":"%s"}

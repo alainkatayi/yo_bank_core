@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(BankLinkController.class)
+@WithBankSecurity
 class BankLinkControllerTest {
 
 	@Autowired
@@ -28,7 +29,7 @@ class BankLinkControllerTest {
 	void returnsVerifiedWhenTheUseCaseAcceptsThePair() throws Exception {
 		when(links.execute("123456789012", "243810000001")).thenReturn(true);
 
-		mockMvc.perform(post("/bank/links/verify")
+		mockMvc.perform(post("/bank/links/verify").with(BankTokens.walletRead())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"accountNumber":"123456789012","phone":"243810000001"}
@@ -41,7 +42,7 @@ class BankLinkControllerTest {
 	void returnsNotVerifiedWhenTheUseCaseRefusesThePair() throws Exception {
 		when(links.execute("123456789012", "243810000002")).thenReturn(false);
 
-		mockMvc.perform(post("/bank/links/verify")
+		mockMvc.perform(post("/bank/links/verify").with(BankTokens.walletRead())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"accountNumber":"123456789012","phone":"243810000002"}
@@ -52,7 +53,7 @@ class BankLinkControllerTest {
 
 	@Test
 	void rejectsAnInvalidAccountNumberBeforeCallingTheUseCase() throws Exception {
-		mockMvc.perform(post("/bank/links/verify")
+		mockMvc.perform(post("/bank/links/verify").with(BankTokens.walletRead())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"accountNumber":"12","phone":"243810000001"}
@@ -65,7 +66,7 @@ class BankLinkControllerTest {
 
 	@Test
 	void rejectsAMissingPhone() throws Exception {
-		mockMvc.perform(post("/bank/links/verify")
+		mockMvc.perform(post("/bank/links/verify").with(BankTokens.walletRead())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"accountNumber":"123456789012"}

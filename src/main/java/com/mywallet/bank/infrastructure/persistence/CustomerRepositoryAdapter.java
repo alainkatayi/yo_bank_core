@@ -2,9 +2,11 @@ package com.mywallet.bank.infrastructure.persistence;
 
 import com.mywallet.bank.domain.model.Customer;
 import com.mywallet.bank.domain.port.CustomerRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -40,6 +42,18 @@ public class CustomerRepositoryAdapter implements CustomerRepository {
 		mapper.update(existing, customer);
 		customers.flush();
 		return mapper.toDomain(existing);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<Customer> search(String term, int page, int size) {
+		return customers.search(term, PageRequest.of(page, size)).stream().map(mapper::toDomain).toList();
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public long countSearch(String term) {
+		return customers.countSearch(term);
 	}
 
 }

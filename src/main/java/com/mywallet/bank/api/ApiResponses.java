@@ -1,6 +1,8 @@
 package com.mywallet.bank.api;
 
 import com.mywallet.bank.application.result.AccountView;
+import com.mywallet.bank.application.result.AdminAccountView;
+import com.mywallet.bank.application.result.AuditEntryView;
 import com.mywallet.bank.application.result.CustomerView;
 import com.mywallet.bank.application.result.OperationResult;
 
@@ -26,6 +28,26 @@ final class ApiResponses {
 				account.maskedHolderName(),
 				account.balance().amount().toPlainString(),
 				account.status().name()
+		);
+	}
+
+	static AdminAccountResponse from(AdminAccountView account) {
+		return new AdminAccountResponse(
+				account.accountNumber(),
+				account.balance().amount().toPlainString(),
+				account.status().name()
+		);
+	}
+
+	static AuditEntryResponse from(AuditEntryView entry) {
+		return new AuditEntryResponse(
+				entry.actorId(),
+				entry.actorUsername(),
+				entry.action().name(),
+				entry.targetType().name(),
+				entry.targetId(),
+				entry.details(),
+				entry.createdAt()
 		);
 	}
 

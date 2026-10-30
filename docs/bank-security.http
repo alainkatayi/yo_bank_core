@@ -1,0 +1,63 @@
+# Agents : stockés dans db_bank. La connexion est un POST JSON, sans formulaire Keycloak.
+# 1. docker compose up -d db_bank
+# 2. mvn spring-boot:run
+# 3. Exécuter « Jeton admin1 » ci-dessous (Body raw JSON dans Postman).
+# 4. Créer un agent, puis bloquer un compte avec ce jeton (docs/bank-api.http).
+# Le jeton wallet reste obtenu auprès de Keycloak, en x-www-form-urlencoded.
+
+@api = http://localhost:9081
+@auth = http://localhost:8180
+
+### Jeton admin1
+POST {{api}}/bank/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin1",
+  "password": "admin123"
+}
+
+> {%
+    client.global.set("adminToken", response.body.access_token);
+%}
+
+### Jeton auditor1
+POST {{api}}/bank/auth/login
+Content-Type: application/json
+
+{
+  "username": "auditor1",
+  "password": "auditor123"
+}
+
+> {%
+    client.global.set("auditorToken", response.body.access_token);
+%}
+
+### Créer un agent
+POST {{api}}/bank/admin/agents
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "username": "agent2",
+  "password": "agent12345",
+  "firstName": "Claire",
+  "lastName": "Agent",
+  "email": "agent2@bank.local",
+  "role": "BANK_ADMIN"
+}
+
+### Lister les agents
+GET {{api}}/bank/admin/agents
+Authorization: Bearer {{adminToken}}
+
+### Jeton wallet
+POST {{auth}}/realms/bank/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&client_id=wallet-service&client_secret=wallet-dev-secret
+
+> {%
+    client.global.set("walletToken", response.body.access_token);
+%}

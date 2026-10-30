@@ -1,11 +1,18 @@
 package com.mywallet.bank.api;
 
 import com.mywallet.bank.application.command.CreateCustomerCommand;
+import com.mywallet.bank.application.command.DepositFundsCommand;
+import com.mywallet.bank.application.command.OpenAccountCommand;
 import com.mywallet.bank.application.exception.CustomerNotFoundException;
 import com.mywallet.bank.application.exception.DuplicatePhoneException;
+import com.mywallet.bank.application.port.in.BlockAccountUseCase;
+import com.mywallet.bank.application.port.in.CloseAccountUseCase;
 import com.mywallet.bank.application.port.in.CreateCustomerUseCase;
 import com.mywallet.bank.application.port.in.DepositFundsUseCase;
 import com.mywallet.bank.application.port.in.OpenAccountUseCase;
+import com.mywallet.bank.application.port.in.ReactivateCustomerUseCase;
+import com.mywallet.bank.application.port.in.SuspendCustomerUseCase;
+import com.mywallet.bank.application.port.in.UnblockAccountUseCase;
 import com.mywallet.bank.application.result.AccountView;
 import com.mywallet.bank.application.result.CustomerView;
 import com.mywallet.bank.application.result.OperationResult;
@@ -35,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(BankAdminController.class)
+@WithBankSecurity
 class BankAdminControllerTest {
 
 	private static final UUID CUSTOMER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -52,9 +60,25 @@ class BankAdminControllerTest {
 	@MockitoBean
 	private DepositFundsUseCase deposits;
 
+	@MockitoBean
+	private BlockAccountUseCase blocks;
+
+	@MockitoBean
+	private UnblockAccountUseCase unblocks;
+
+	@MockitoBean
+	private CloseAccountUseCase closures;
+
+	@MockitoBean
+	private SuspendCustomerUseCase suspensions;
+
+	@MockitoBean
+	private ReactivateCustomerUseCase reactivations;
+
 	@Test
 	void createsACustomer() throws Exception {
 		when(customers.execute(new CreateCustomerCommand(
+				BankTokens.ACTOR,
 				"Amina",
 				"Kabila",
 				"243810000001",
@@ -69,7 +93,7 @@ class BankAdminControllerTest {
 				CREATED_AT
 		));
 
-		mockMvc.perform(post("/bank/admin/customers")
+		mockMvc.perform(post("/bank/admin/customers").with(BankTokens.admin())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"firstName":"Amina","lastName":"Kabila","phone":"243810000001","email":"amina@example.com"}
@@ -84,14 +108,14 @@ class BankAdminControllerTest {
 
 	@Test
 	void opensAnAccount() throws Exception {
-		when(accounts.execute(CUSTOMER_ID)).thenReturn(new AccountView(
+		when(accounts.execute(new OpenAccountCommand(BankTokens.ACTOR, CUSTOMER_ID))).thenReturn(new AccountView(
 				"123456789012",
 				"A*** K***",
 				Money.zero(),
 				AccountStatus.ACTIVE
 		));
 
-		mockMvc.perform(post("/bank/admin/customers/" + CUSTOMER_ID + "/accounts"))
+		mockMvc.perform(post("/bank/admin/customers/" + CUSTOMER_ID + "/accounts").with(BankTokens.admin()))
 				.andExpect(status().isCreated())
 				.andExpect(header().string("Location", org.hamcrest.Matchers.endsWith("/bank/accounts/123456789012")))
 				.andExpect(jsonPath("$.accountNumber").value("123456789012"))
@@ -102,7 +126,8 @@ class BankAdminControllerTest {
 
 	@Test
 	void depositsWithTheOperationBody() throws Exception {
-		when(deposits.execute("123456789012", "100000.00")).thenReturn(new OperationResult(
+		when(deposits.execute(new DepositFundsCommand(BankTokens.ACTOR, "123456789012", "100000.00")))
+				.thenReturn(new OperationResult(
 				"ADMIN-DEP-11111111-1111-1111-1111-111111111111",
 				OperationType.CREDIT,
 				OperationStatus.SUCCESS,
@@ -111,7 +136,7 @@ class BankAdminControllerTest {
 				CREATED_AT
 		));
 
-		mockMvc.perform(post("/bank/admin/accounts/123456789012/deposit")
+		mockMvc.perform(post("/bank/admin/accounts/123456789012/deposit").with(BankTokens.admin())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"amount":"100000.00"}
@@ -127,7 +152,7 @@ class BankAdminControllerTest {
 	void mapsADuplicatePhone() throws Exception {
 		when(customers.execute(any())).thenThrow(new DuplicatePhoneException());
 
-		String body = mockMvc.perform(post("/bank/admin/customers")
+		String body = mockMvc.perform(post("/bank/admin/customers").with(BankTokens.admin())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"firstName":"Amina","lastName":"Kabila","phone":"243810000001"}
@@ -142,16 +167,17 @@ class BankAdminControllerTest {
 
 	@Test
 	void mapsAnUnknownCustomer() throws Exception {
-		when(accounts.execute(CUSTOMER_ID)).thenThrow(new CustomerNotFoundException());
+		when(accounts.execute(new OpenAccountCommand(BankTokens.ACTOR, CUSTOMER_ID)))
+				.thenThrow(new CustomerNotFoundException());
 
-		mockMvc.perform(post("/bank/admin/customers/" + CUSTOMER_ID + "/accounts"))
+		mockMvc.perform(post("/bank/admin/customers/" + CUSTOMER_ID + "/accounts").with(BankTokens.admin()))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.code").value("CUSTOMER_NOT_FOUND"));
 	}
 
 	@Test
 	void rejectsACustomerIdThatIsNotAUuid() throws Exception {
-		mockMvc.perform(post("/bank/admin/customers/not-a-uuid/accounts"))
+		mockMvc.perform(post("/bank/admin/customers/not-a-uuid/accounts").with(BankTokens.admin()))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
 		verify(accounts, never()).execute(any());
@@ -159,21 +185,21 @@ class BankAdminControllerTest {
 
 	@Test
 	void rejectsADepositAmountSentAsAJsonNumber() throws Exception {
-		mockMvc.perform(post("/bank/admin/accounts/123456789012/deposit")
+		mockMvc.perform(post("/bank/admin/accounts/123456789012/deposit").with(BankTokens.admin())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"amount":100000.5}
 								"""))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
-		verify(deposits, never()).execute(any(), any());
+		verify(deposits, never()).execute(any());
 	}
 
 	@Test
 	void mapsAnInvalidDepositAmount() throws Exception {
-		when(deposits.execute(any(), any())).thenThrow(new InvalidAmountException("négatif -1"));
+		when(deposits.execute(any())).thenThrow(new InvalidAmountException("négatif -1"));
 
-		String body = mockMvc.perform(post("/bank/admin/accounts/123456789012/deposit")
+		String body = mockMvc.perform(post("/bank/admin/accounts/123456789012/deposit").with(BankTokens.admin())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"amount":"-1.00"}

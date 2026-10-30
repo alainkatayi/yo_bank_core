@@ -3,13 +3,20 @@ package com.mywallet.bank.api;
 import com.mywallet.bank.application.exception.AccountNotFoundException;
 import com.mywallet.bank.application.exception.ConcurrentUpdateException;
 import com.mywallet.bank.application.exception.CustomerNotFoundException;
+import com.mywallet.bank.application.exception.CustomerSuspendedException;
 import com.mywallet.bank.application.exception.DuplicatePhoneException;
+import com.mywallet.bank.application.exception.DuplicateUsernameException;
+import com.mywallet.bank.application.exception.InvalidCredentialsException;
 import com.mywallet.bank.application.exception.IdempotencyConflictException;
+import com.mywallet.bank.application.exception.InvalidQueryException;
 import com.mywallet.bank.application.exception.OperationNotFoundException;
+import com.mywallet.bank.domain.exception.AccountNotEmptyException;
 import com.mywallet.bank.domain.exception.InvalidAccountNumberException;
 import com.mywallet.bank.domain.exception.InvalidAmountException;
+import com.mywallet.bank.domain.exception.InvalidStateTransitionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -110,6 +117,62 @@ public class GlobalExceptionHandler {
 		return body(
 				HttpStatus.CONFLICT,
 				problem(HttpStatus.CONFLICT, "IDEMPOTENCY_CONFLICT", "La référence est déjà utilisée", request)
+		);
+	}
+
+	@ExceptionHandler(InvalidQueryException.class)
+	ResponseEntity<ProblemDetail> invalidQuery(HttpServletRequest request) {
+		return body(
+				HttpStatus.BAD_REQUEST,
+				problem(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "La requête est invalide", request)
+		);
+	}
+
+	@ExceptionHandler(InvalidCredentialsException.class)
+	ResponseEntity<ProblemDetail> invalidCredentials(HttpServletRequest request) {
+		return body(
+				HttpStatus.UNAUTHORIZED,
+				problem(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "Identifiants invalides", request)
+		);
+	}
+
+	@ExceptionHandler(DuplicateUsernameException.class)
+	ResponseEntity<ProblemDetail> duplicateUsername(HttpServletRequest request) {
+		return body(
+				HttpStatus.CONFLICT,
+				problem(HttpStatus.CONFLICT, "DUPLICATE_USERNAME", "Ce nom d'utilisateur est déjà utilisé", request)
+		);
+	}
+
+	@ExceptionHandler(InsufficientAuthenticationException.class)
+	ResponseEntity<ProblemDetail> unauthenticated(HttpServletRequest request) {
+		return body(
+				HttpStatus.UNAUTHORIZED,
+				problem(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "Authentification requise", request)
+		);
+	}
+
+	@ExceptionHandler(AccountNotEmptyException.class)
+	ResponseEntity<ProblemDetail> accountNotEmpty(HttpServletRequest request) {
+		return body(
+				HttpStatus.CONFLICT,
+				problem(HttpStatus.CONFLICT, "ACCOUNT_NOT_EMPTY", "Le solde doit être nul pour clôturer le compte", request)
+		);
+	}
+
+	@ExceptionHandler(InvalidStateTransitionException.class)
+	ResponseEntity<ProblemDetail> invalidTransition(HttpServletRequest request) {
+		return body(
+				HttpStatus.CONFLICT,
+				problem(HttpStatus.CONFLICT, "INVALID_STATE_TRANSITION", "Transition de statut interdite", request)
+		);
+	}
+
+	@ExceptionHandler(CustomerSuspendedException.class)
+	ResponseEntity<ProblemDetail> customerSuspended(HttpServletRequest request) {
+		return body(
+				HttpStatus.CONFLICT,
+				problem(HttpStatus.CONFLICT, "CUSTOMER_SUSPENDED", "Le client est suspendu", request)
 		);
 	}
 

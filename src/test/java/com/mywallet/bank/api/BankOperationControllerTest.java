@@ -40,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(BankOperationController.class)
+@WithBankSecurity
 class BankOperationControllerTest {
 
 	private static final Instant CREATED_AT = Instant.parse("2026-10-29T12:00:00Z");
@@ -62,7 +63,7 @@ class BankOperationControllerTest {
 		when(debits.execute(new OperationCommand("ref-debit", ACCOUNT, "3000.00")))
 				.thenReturn(success("ref-debit", OperationType.DEBIT, "47000.00"));
 
-		mockMvc.perform(post("/bank/operations/debit")
+		mockMvc.perform(post("/bank/operations/debit").with(BankTokens.walletDebit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(operationJson("ref-debit", ACCOUNT, "3000.00")))
 				.andExpect(status().isOk())
@@ -80,7 +81,7 @@ class BankOperationControllerTest {
 		when(credits.execute(new OperationCommand("ref-credit", ACCOUNT, "5000.00")))
 				.thenReturn(success("ref-credit", OperationType.CREDIT, "5000.00"));
 
-		mockMvc.perform(post("/bank/operations/credit")
+		mockMvc.perform(post("/bank/operations/credit").with(BankTokens.walletCredit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(operationJson("ref-credit", ACCOUNT, "5000.00")))
 				.andExpect(status().isOk())
@@ -101,7 +102,7 @@ class BankOperationControllerTest {
 				CREATED_AT
 		));
 
-		mockMvc.perform(post("/bank/operations/debit")
+		mockMvc.perform(post("/bank/operations/debit").with(BankTokens.walletDebit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(operationJson("ref-rejected", ACCOUNT, "10.00")))
 				.andExpect(status().isOk())
@@ -115,7 +116,7 @@ class BankOperationControllerTest {
 	void readsAnOperation() throws Exception {
 		when(operations.execute("ref-debit")).thenReturn(success("ref-debit", OperationType.DEBIT, "47000.00"));
 
-		mockMvc.perform(get("/bank/operations/ref-debit"))
+		mockMvc.perform(get("/bank/operations/ref-debit").with(BankTokens.walletRead()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.reference").value("ref-debit"))
 				.andExpect(jsonPath("$.status").value("SUCCESS"))
@@ -124,7 +125,7 @@ class BankOperationControllerTest {
 
 	@Test
 	void rejectsAMissingReference() throws Exception {
-		mockMvc.perform(post("/bank/operations/debit")
+		mockMvc.perform(post("/bank/operations/debit").with(BankTokens.walletDebit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"accountNumber":"123456789012","amount":"10.00"}
@@ -138,7 +139,7 @@ class BankOperationControllerTest {
 
 	@Test
 	void rejectsAReferenceLongerThan64Characters() throws Exception {
-		mockMvc.perform(post("/bank/operations/debit")
+		mockMvc.perform(post("/bank/operations/debit").with(BankTokens.walletDebit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(operationJson("r".repeat(65), ACCOUNT, "10.00")))
 				.andExpect(status().isBadRequest())
@@ -148,7 +149,7 @@ class BankOperationControllerTest {
 
 	@Test
 	void rejectsAnAmountSentAsAJsonNumber() throws Exception {
-		mockMvc.perform(post("/bank/operations/debit")
+		mockMvc.perform(post("/bank/operations/debit").with(BankTokens.walletDebit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"reference":"ref-1","accountNumber":"123456789012","amount":5000.5}
@@ -161,7 +162,7 @@ class BankOperationControllerTest {
 
 	@Test
 	void rejectsUnreadableJson() throws Exception {
-		mockMvc.perform(post("/bank/operations/debit")
+		mockMvc.perform(post("/bank/operations/debit").with(BankTokens.walletDebit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("{"))
 				.andExpect(status().isBadRequest())
@@ -173,7 +174,7 @@ class BankOperationControllerTest {
 	void mapsAnInvalidAmount() throws Exception {
 		when(debits.execute(any())).thenThrow(new InvalidAmountException("échelle 12.345"));
 
-		String body = problem(mockMvc.perform(post("/bank/operations/debit")
+		String body = problem(mockMvc.perform(post("/bank/operations/debit").with(BankTokens.walletDebit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(operationJson("ref-1", ACCOUNT, "12.345")))
 				.andExpect(status().is(422))
@@ -186,7 +187,7 @@ class BankOperationControllerTest {
 	void mapsAnUnknownOperation() throws Exception {
 		when(operations.execute("missing")).thenThrow(new OperationNotFoundException("missing"));
 
-		mockMvc.perform(get("/bank/operations/missing"))
+		mockMvc.perform(get("/bank/operations/missing").with(BankTokens.walletRead()))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.code").value("OPERATION_NOT_FOUND"))
 				.andExpect(jsonPath("$.detail").value("Opération introuvable"));
@@ -196,7 +197,7 @@ class BankOperationControllerTest {
 	void mapsAnIdempotencyConflict() throws Exception {
 		when(debits.execute(any())).thenThrow(new IdempotencyConflictException("ref-1"));
 
-		mockMvc.perform(post("/bank/operations/debit")
+		mockMvc.perform(post("/bank/operations/debit").with(BankTokens.walletDebit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(operationJson("ref-1", ACCOUNT, "10.00")))
 				.andExpect(status().isConflict())
@@ -207,7 +208,7 @@ class BankOperationControllerTest {
 	void mapsAConcurrentUpdateWithRetryAfter() throws Exception {
 		when(debits.execute(any())).thenThrow(new ConcurrentUpdateException("ref-1", new RuntimeException("lock-detail")));
 
-		String body = problem(mockMvc.perform(post("/bank/operations/debit")
+		String body = problem(mockMvc.perform(post("/bank/operations/debit").with(BankTokens.walletDebit())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(operationJson("ref-1", ACCOUNT, "10.00")))
 				.andExpect(status().isServiceUnavailable())
@@ -225,7 +226,7 @@ class BankOperationControllerTest {
 		appender.start();
 		logger.addAppender(appender);
 		try {
-			String body = problem(mockMvc.perform(post("/bank/operations/debit")
+			String body = problem(mockMvc.perform(post("/bank/operations/debit").with(BankTokens.walletDebit())
 							.contentType(MediaType.APPLICATION_JSON)
 							.content(operationJson("ref-1", ACCOUNT, "10.00")))
 					.andExpect(status().isInternalServerError())

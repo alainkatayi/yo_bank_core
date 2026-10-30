@@ -5,6 +5,7 @@ import com.mywallet.bank.domain.model.BankAccount;
 import com.mywallet.bank.domain.port.AccountRepository;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,6 +37,13 @@ final class InMemoryAccountRepository implements AccountRepository {
 	@Override
 	public Optional<BankAccount> findById(UUID id) {
 		return Optional.ofNullable(accounts.get(id));
+	}
+
+	@Override
+	public List<BankAccount> findByCustomerId(UUID customerId) {
+		return accounts.values().stream()
+				.filter(account -> account.getCustomerId().equals(customerId))
+				.toList();
 	}
 
 	@Override

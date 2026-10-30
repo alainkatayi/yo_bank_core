@@ -1,5 +1,7 @@
 package com.mywallet.bank.domain.model;
 
+import com.mywallet.bank.domain.exception.InvalidStateTransitionException;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -10,7 +12,7 @@ public final class Customer {
 	private final String lastName;
 	private final String phone;
 	private final String email;
-	private final CustomerStatus status;
+	private CustomerStatus status;
 	private final Instant createdAt;
 
 	public Customer(
@@ -41,6 +43,25 @@ public final class Customer {
 		this.email = email;
 		this.status = status;
 		this.createdAt = createdAt;
+	}
+
+	/**
+	 * La suspension ne bloque pas les comptes du client.
+	 * Chaque compte garde son statut : un débit n'est refusé pour blocage
+	 * que si le compte lui-même est BLOCKED ou CLOSED.
+	 */
+	public void suspend() {
+		if (status != CustomerStatus.ACTIVE) {
+			throw new InvalidStateTransitionException();
+		}
+		status = CustomerStatus.SUSPENDED;
+	}
+
+	public void reactivate() {
+		if (status != CustomerStatus.SUSPENDED) {
+			throw new InvalidStateTransitionException();
+		}
+		status = CustomerStatus.ACTIVE;
 	}
 
 	public UUID getId() {

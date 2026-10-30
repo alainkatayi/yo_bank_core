@@ -1,7 +1,28 @@
 @host = http://localhost:9081
 
+# adminToken : POST /bank/auth/login (docs/bank-security.http). walletToken : Keycloak, même fichier.
+
+### Créer un agent
+POST {{host}}/bank/admin/agents
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "username": "agent2",
+  "password": "agent12345",
+  "firstName": "Claire",
+  "lastName": "Agent",
+  "email": "agent2@bank.local",
+  "role": "BANK_ADMIN"
+}
+
+### Lister les agents
+GET {{host}}/bank/admin/agents
+Authorization: Bearer {{adminToken}}
+
 ### Créer un client
 POST {{host}}/bank/admin/customers
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -11,19 +32,62 @@ Content-Type: application/json
   "email": "amina.kabila@example.com"
 }
 
+### Lire un client
+GET {{host}}/bank/admin/customers/11111111-1111-1111-1111-111111111111
+Authorization: Bearer {{adminToken}}
+
+### Rechercher des clients
+GET {{host}}/bank/admin/customers?search=kabila&page=0&size=20
+Authorization: Bearer {{adminToken}}
+
 ### Ouvrir un compte
 POST {{host}}/bank/admin/customers/11111111-1111-1111-1111-111111111111/accounts
+Authorization: Bearer {{adminToken}}
+
+### Comptes d'un client
+GET {{host}}/bank/admin/customers/11111111-1111-1111-1111-111111111111/accounts
+Authorization: Bearer {{adminToken}}
 
 ### Dépôt administrateur
 POST {{host}}/bank/admin/accounts/000000000000/deposit
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
   "amount": "100000.00"
 }
 
+### Bloquer un compte
+POST {{host}}/bank/admin/accounts/000000000000/block
+Authorization: Bearer {{adminToken}}
+
+### Débloquer un compte
+POST {{host}}/bank/admin/accounts/000000000000/unblock
+Authorization: Bearer {{adminToken}}
+
+### Clôturer un compte
+POST {{host}}/bank/admin/accounts/000000000000/close
+Authorization: Bearer {{adminToken}}
+
+### Suspendre un client
+POST {{host}}/bank/admin/customers/11111111-1111-1111-1111-111111111111/suspend
+Authorization: Bearer {{adminToken}}
+
+### Réactiver un client
+POST {{host}}/bank/admin/customers/11111111-1111-1111-1111-111111111111/reactivate
+Authorization: Bearer {{adminToken}}
+
+### Historique d'un compte
+GET {{host}}/bank/admin/accounts/000000000000/operations?type=DEBIT&status=SUCCESS&page=0&size=20
+Authorization: Bearer {{adminToken}}
+
+### Journal d'audit
+GET {{host}}/bank/admin/audit?page=0&size=20
+Authorization: Bearer {{adminToken}}
+
 ### Débit
 POST {{host}}/bank/operations/debit
+Authorization: Bearer {{walletToken}}
 Content-Type: application/json
 
 {
@@ -34,6 +98,7 @@ Content-Type: application/json
 
 ### Crédit
 POST {{host}}/bank/operations/credit
+Authorization: Bearer {{walletToken}}
 Content-Type: application/json
 
 {
@@ -44,12 +109,15 @@ Content-Type: application/json
 
 ### Lire une opération
 GET {{host}}/bank/operations/debit-exemple-1
+Authorization: Bearer {{walletToken}}
 
 ### Lire un compte
 GET {{host}}/bank/accounts/000000000000
+Authorization: Bearer {{walletToken}}
 
 ### Vérifier une liaison
 POST {{host}}/bank/links/verify
+Authorization: Bearer {{walletToken}}
 Content-Type: application/json
 
 {

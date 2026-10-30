@@ -1,6 +1,7 @@
 package com.mywallet.bank.application.service;
 
 import com.mywallet.bank.application.RetryProperties;
+import com.mywallet.bank.application.command.AdminAuditCommand;
 import com.mywallet.bank.application.command.OperationCommand;
 import com.mywallet.bank.application.exception.ConcurrentUpdateException;
 import com.mywallet.bank.application.result.OperationResult;
@@ -30,12 +31,16 @@ public class OperationApplicationService {
 	}
 
 	public OperationResult execute(OperationCommand command, OperationType type) {
+		return execute(command, type, null);
+	}
+
+	public OperationResult execute(OperationCommand command, OperationType type, AdminAuditCommand audit) {
 		OperationRequests.parse(command);
 		RuntimeException lastFailure = null;
 		int maxAttempts = retryProperties.maxAttempts();
 		for (int attempt = 1; attempt <= maxAttempts; attempt++) {
 			try {
-				return operationExecutor.execute(command, type);
+				return operationExecutor.execute(command, type, audit);
 			} catch (OptimisticLockingFailureException exception) {
 				lastFailure = exception;
 			} catch (DataIntegrityViolationException exception) {

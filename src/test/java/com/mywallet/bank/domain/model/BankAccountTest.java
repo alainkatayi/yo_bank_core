@@ -1,6 +1,8 @@
 package com.mywallet.bank.domain.model;
 
+import com.mywallet.bank.domain.exception.AccountNotEmptyException;
 import com.mywallet.bank.domain.exception.InvalidAmountException;
+import com.mywallet.bank.domain.exception.InvalidStateTransitionException;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -94,6 +96,53 @@ class BankAccountTest {
 		assertThatThrownBy(() -> account.credit(Money.of("-5")))
 				.isInstanceOf(InvalidAmountException.class);
 		assertThat(account.getBalance()).isEqualTo(Money.of("10.00"));
+	}
+
+	@Test
+	void blocksAnActiveAccountAndRejectsLaterMovements() {
+		BankAccount account = account(Money.of("10.00"), AccountStatus.ACTIVE);
+
+		account.block();
+
+		assertThat(account.getStatus()).isEqualTo(AccountStatus.BLOCKED);
+		assertThat(account.debit(Money.of("1.00")))
+				.isEqualTo(new AccountMovementResult.Rejected(RejectionReason.ACCOUNT_BLOCKED));
+		assertThat(account.credit(Money.of("1.00")))
+				.isEqualTo(new AccountMovementResult.Rejected(RejectionReason.ACCOUNT_BLOCKED));
+		assertThat(account.getBalance()).isEqualTo(Money.of("10.00"));
+	}
+
+	@Test
+	void unblocksOnlyABlockedAccount() {
+		BankAccount account = account(Money.of("10.00"), AccountStatus.BLOCKED);
+
+		account.unblock();
+
+		assertThat(account.getStatus()).isEqualTo(AccountStatus.ACTIVE);
+		assertThat(account.debit(Money.of("1.00")))
+				.isEqualTo(new AccountMovementResult.Accepted(Money.of("9.00")));
+	}
+
+	@Test
+	void closesOnlyWhenTheBalanceIsZeroAndRefusesReopening() {
+		BankAccount funded = account(Money.of("10.00"), AccountStatus.ACTIVE);
+		assertThatThrownBy(funded::close).isInstanceOf(AccountNotEmptyException.class);
+		assertThat(funded.getStatus()).isEqualTo(AccountStatus.ACTIVE);
+
+		BankAccount empty = account(Money.zero(), AccountStatus.BLOCKED);
+		empty.close();
+		assertThat(empty.getStatus()).isEqualTo(AccountStatus.CLOSED);
+		assertThat(empty.debit(Money.of("1.00")))
+				.isEqualTo(new AccountMovementResult.Rejected(RejectionReason.ACCOUNT_CLOSED));
+		assertThatThrownBy(empty::unblock).isInstanceOf(InvalidStateTransitionException.class);
+		assertThatThrownBy(empty::block).isInstanceOf(InvalidStateTransitionException.class);
+		assertThatThrownBy(empty::close).isInstanceOf(InvalidStateTransitionException.class);
+	}
+
+	@Test
+	void refusesABlockWhenTheAccountIsNotActive() {
+		BankAccount account = account(Money.zero(), AccountStatus.BLOCKED);
+		assertThatThrownBy(account::block).isInstanceOf(InvalidStateTransitionException.class);
 	}
 
 	private static BankAccount account(Money balance, AccountStatus status) {

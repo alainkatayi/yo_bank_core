@@ -7,6 +7,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,6 +31,12 @@ public class AccountRepositoryAdapter implements AccountRepository {
 	@Transactional(readOnly = true)
 	public Optional<BankAccount> findById(UUID id) {
 		return accounts.findById(id).map(mapper::toDomain);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<BankAccount> findByCustomerId(UUID customerId) {
+		return accounts.findByCustomerIdOrderByCreatedAtAsc(customerId).stream().map(mapper::toDomain).toList();
 	}
 
 	@Override

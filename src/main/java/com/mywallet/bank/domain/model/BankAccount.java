@@ -1,6 +1,8 @@
 package com.mywallet.bank.domain.model;
 
+import com.mywallet.bank.domain.exception.AccountNotEmptyException;
 import com.mywallet.bank.domain.exception.InvalidAmountException;
+import com.mywallet.bank.domain.exception.InvalidStateTransitionException;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -11,7 +13,7 @@ public final class BankAccount {
 	private final AccountNumber accountNumber;
 	private final UUID customerId;
 	private Money balance;
-	private final AccountStatus status;
+	private AccountStatus status;
 	private final long version;
 	private final Instant createdAt;
 
@@ -52,6 +54,30 @@ public final class BankAccount {
 		this.status = status;
 		this.version = version;
 		this.createdAt = createdAt;
+	}
+
+	public void block() {
+		if (status != AccountStatus.ACTIVE) {
+			throw new InvalidStateTransitionException();
+		}
+		status = AccountStatus.BLOCKED;
+	}
+
+	public void unblock() {
+		if (status != AccountStatus.BLOCKED) {
+			throw new InvalidStateTransitionException();
+		}
+		status = AccountStatus.ACTIVE;
+	}
+
+	public void close() {
+		if (status != AccountStatus.ACTIVE && status != AccountStatus.BLOCKED) {
+			throw new InvalidStateTransitionException();
+		}
+		if (!balance.isZero()) {
+			throw new AccountNotEmptyException();
+		}
+		status = AccountStatus.CLOSED;
 	}
 
 	public AccountMovementResult debit(Money amount) {

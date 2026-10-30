@@ -1,6 +1,7 @@
 package com.mywallet.bank.application.service;
 
 import com.mywallet.bank.application.RetryProperties;
+import com.mywallet.bank.application.command.AdminAuditCommand;
 import com.mywallet.bank.application.command.OperationCommand;
 import com.mywallet.bank.application.exception.ConcurrentUpdateException;
 import com.mywallet.bank.application.result.OperationResult;
@@ -102,12 +103,17 @@ class OperationApplicationServiceTest {
 		private int calls;
 
 		private ScriptedExecutor(Queue<Object> script) {
-			super(new InMemoryAccountRepository(), new InMemoryOperationRepository(), java.time.Clock.systemUTC());
+			super(
+					new InMemoryAccountRepository(),
+					new InMemoryOperationRepository(),
+					new InMemoryAuditLogRepository(),
+					java.time.Clock.systemUTC()
+			);
 			this.script = script;
 		}
 
 		@Override
-		public OperationResult execute(OperationCommand command, OperationType type) {
+		public OperationResult execute(OperationCommand command, OperationType type, AdminAuditCommand audit) {
 			calls++;
 			Object next = script.remove();
 			if (next instanceof RuntimeException exception) {

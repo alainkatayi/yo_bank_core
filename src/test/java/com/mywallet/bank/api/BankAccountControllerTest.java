@@ -19,6 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(BankAccountController.class)
+@WithBankSecurity
 class BankAccountControllerTest {
 
 	@Autowired
@@ -36,7 +37,7 @@ class BankAccountControllerTest {
 				AccountStatus.ACTIVE
 		));
 
-		mockMvc.perform(get("/bank/accounts/123456789012"))
+		mockMvc.perform(get("/bank/accounts/123456789012").with(BankTokens.walletRead()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.accountNumber").value("123456789012"))
 				.andExpect(jsonPath("$.holderName").value("A*** K***"))
@@ -48,7 +49,7 @@ class BankAccountControllerTest {
 	void mapsAnUnknownAccount() throws Exception {
 		when(accounts.execute("123456789012")).thenThrow(new AccountNotFoundException("123456789012"));
 
-		mockMvc.perform(get("/bank/accounts/123456789012"))
+		mockMvc.perform(get("/bank/accounts/123456789012").with(BankTokens.walletRead()))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.code").value("ACCOUNT_NOT_FOUND"))
 				.andExpect(jsonPath("$.detail").value("Compte introuvable"));
@@ -58,7 +59,7 @@ class BankAccountControllerTest {
 	void mapsAnInvalidAccountNumber() throws Exception {
 		when(accounts.execute("abc")).thenThrow(new InvalidAccountNumberException("format secret-abc"));
 
-		String body = mockMvc.perform(get("/bank/accounts/abc"))
+		String body = mockMvc.perform(get("/bank/accounts/abc").with(BankTokens.walletRead()))
 				.andExpect(status().is(422))
 				.andExpect(jsonPath("$.code").value("INVALID_ACCOUNT_NUMBER"))
 				.andReturn()
