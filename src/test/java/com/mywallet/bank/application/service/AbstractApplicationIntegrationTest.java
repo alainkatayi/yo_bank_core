@@ -36,10 +36,10 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @SpringBootTest
-abstract class AbstractApplicationIntegrationTest {
+public abstract class AbstractApplicationIntegrationTest {
 
 	@ServiceConnection
-	static final PostgreSQLContainer POSTGRES = startedPostgres();
+	protected static final PostgreSQLContainer POSTGRES = startedPostgres();
 
 	private static final AtomicInteger SEQUENCE = new AtomicInteger();
 

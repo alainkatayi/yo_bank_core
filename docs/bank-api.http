@@ -1,0 +1,58 @@
+@host = http://localhost:9081
+
+### Créer un client
+POST {{host}}/bank/admin/customers
+Content-Type: application/json
+
+{
+  "firstName": "Amina",
+  "lastName": "Kabila",
+  "phone": "243810000001",
+  "email": "amina.kabila@example.com"
+}
+
+### Ouvrir un compte
+POST {{host}}/bank/admin/customers/11111111-1111-1111-1111-111111111111/accounts
+
+### Dépôt administrateur
+POST {{host}}/bank/admin/accounts/000000000000/deposit
+Content-Type: application/json
+
+{
+  "amount": "100000.00"
+}
+
+### Débit
+POST {{host}}/bank/operations/debit
+Content-Type: application/json
+
+{
+  "reference": "debit-exemple-1",
+  "accountNumber": "000000000000",
+  "amount": "30000.00"
+}
+
+### Crédit
+POST {{host}}/bank/operations/credit
+Content-Type: application/json
+
+{
+  "reference": "credit-exemple-1",
+  "accountNumber": "000000000000",
+  "amount": "5000.00"
+}
+
+### Lire une opération
+GET {{host}}/bank/operations/debit-exemple-1
+
+### Lire un compte
+GET {{host}}/bank/accounts/000000000000
+
+### Vérifier une liaison
+POST {{host}}/bank/links/verify
+Content-Type: application/json
+
+{
+  "accountNumber": "000000000000",
+  "phone": "243810000001"
+}
