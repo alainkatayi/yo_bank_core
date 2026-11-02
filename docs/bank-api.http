@@ -115,12 +115,23 @@ Authorization: Bearer {{walletToken}}
 GET {{host}}/bank/accounts/000000000000
 Authorization: Bearer {{walletToken}}
 
-### Vérifier une liaison
-POST {{host}}/bank/links/verify
+### Initier une liaison (jeton wallet-service, scope bank:link)
+# Le code arrive par e-mail. Le lire dans Mailpit : http://localhost:8025
+POST {{host}}/bank/links/initiate
 Authorization: Bearer {{walletToken}}
 Content-Type: application/json
 
 {
   "accountNumber": "000000000000",
   "phone": "243810000001"
+}
+
+### Confirmer une liaison
+POST {{host}}/bank/links/confirm
+Authorization: Bearer {{walletToken}}
+Content-Type: application/json
+
+{
+  "linkId": "33333333-3333-3333-3333-333333333333",
+  "code": "123456"
 }

@@ -139,16 +139,17 @@ class BankApiIntegrationTest extends AbstractApplicationIntegrationTest {
 	}
 
 	@Test
-	void verifiesALinkOnlyForTheMatchingPhone() throws Exception {
+	void initiatesALinkWithoutRevealingWhetherTheAccountExists() throws Exception {
 		Opened opened = openAccount();
-		String match = verify(opened.accountNumber(), opened.phone());
-		String wrongPhone = verify(opened.accountNumber(), "244000000000");
-		String unknownAccount = verify("000000000000", opened.phone());
+		String match = initiate(opened.accountNumber(), opened.phone());
+		String wrongPhone = initiate(opened.accountNumber(), "244000000000");
+		String unknownAccount = initiate("000000000000", opened.phone());
 
-		assertThat(JsonPath.<Boolean>read(match, "$.verified")).isTrue();
-		assertThat(wrongPhone).isEqualTo(unknownAccount);
-		assertThat(JsonPath.<Boolean>read(wrongPhone, "$.verified")).isFalse();
-		assertThat(wrongPhone).doesNotContain(opened.phone(), opened.accountNumber(), "ACCOUNT_NOT_FOUND");
+		assertThat(JsonPath.<Integer>read(match, "$.expiresIn")).isEqualTo(300);
+		assertThat(JsonPath.<Integer>read(wrongPhone, "$.expiresIn")).isEqualTo(300);
+		assertThat(JsonPath.<Integer>read(unknownAccount, "$.expiresIn")).isEqualTo(300);
+		assertThat(wrongPhone).doesNotContain(opened.phone(), opened.accountNumber(), "verified", "ACCOUNT_NOT_FOUND");
+		assertThat(unknownAccount).doesNotContain(opened.phone(), "verified", "ACCOUNT_NOT_FOUND");
 	}
 
 	@Test
@@ -219,13 +220,13 @@ class BankApiIntegrationTest extends AbstractApplicationIntegrationTest {
 				.getContentAsString();
 	}
 
-	private String verify(String accountNumber, String phone) throws Exception {
-		return mockMvc.perform(post("/bank/links/verify").with(BankTokens.walletRead())
+	private String initiate(String accountNumber, String phone) throws Exception {
+		return mockMvc.perform(post("/bank/links/initiate").with(BankTokens.walletLink())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"accountNumber":"%s","phone":"%s"}
 								""".formatted(accountNumber, phone)))
-				.andExpect(status().isOk())
+				.andExpect(status().isAccepted())
 				.andReturn()
 				.getResponse()
 				.getContentAsString();

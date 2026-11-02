@@ -161,6 +161,14 @@
         "include.in.token.scope": "true",
         "display.on.consent.screen": "false"
       }
+    },
+    {
+      "name": "bank:link",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
     }
   ],
   "clients": [
@@ -195,7 +203,7 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": true,
-      "defaultClientScopes": ["profile", "bank:debit", "bank:credit", "bank:read"],
+      "defaultClientScopes": ["profile", "bank:debit", "bank:credit", "bank:read", "bank:link"],
       "optionalClientScopes": [],
       "attributes": {
         "client.secret.creation.time": "1730000000"

@@ -52,7 +52,7 @@ Content-Type: application/json
 GET {{api}}/bank/admin/agents
 Authorization: Bearer {{adminToken}}
 
-### Jeton wallet
+### Jeton wallet (scopes bank:debit, bank:credit, bank:read, bank:link)
 POST {{auth}}/realms/bank/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 

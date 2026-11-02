@@ -44,8 +44,12 @@ public final class BankTokens {
 		return wallet("bank:read");
 	}
 
+	public static RequestPostProcessor walletLink() {
+		return wallet("bank:link");
+	}
+
 	public static RequestPostProcessor walletAll() {
-		return wallet("bank:debit", "bank:credit", "bank:read");
+		return wallet("bank:debit", "bank:credit", "bank:read", "bank:link");
 	}
 
 	public static RequestPostProcessor wallet(String... scopes) {

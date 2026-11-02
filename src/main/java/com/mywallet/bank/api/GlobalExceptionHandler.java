@@ -7,6 +7,8 @@ import com.mywallet.bank.application.exception.CustomerSuspendedException;
 import com.mywallet.bank.application.exception.DuplicatePhoneException;
 import com.mywallet.bank.application.exception.DuplicateUsernameException;
 import com.mywallet.bank.application.exception.InvalidCredentialsException;
+import com.mywallet.bank.application.exception.InvalidLinkCodeException;
+import com.mywallet.bank.application.exception.TooManyLinkRequestsException;
 import com.mywallet.bank.application.exception.IdempotencyConflictException;
 import com.mywallet.bank.application.exception.InvalidQueryException;
 import com.mywallet.bank.application.exception.OperationNotFoundException;
@@ -174,6 +176,27 @@ public class GlobalExceptionHandler {
 				HttpStatus.CONFLICT,
 				problem(HttpStatus.CONFLICT, "CUSTOMER_SUSPENDED", "Le client est suspendu", request)
 		);
+	}
+
+	@ExceptionHandler(InvalidLinkCodeException.class)
+	ResponseEntity<ProblemDetail> invalidLinkCode(HttpServletRequest request) {
+		return body(
+				HttpStatus.BAD_REQUEST,
+				problem(HttpStatus.BAD_REQUEST, "INVALID_LINK_CODE", "Code de liaison invalide", request)
+		);
+	}
+
+	@ExceptionHandler(TooManyLinkRequestsException.class)
+	ResponseEntity<ProblemDetail> tooManyLinkRequests(TooManyLinkRequestsException exception, HttpServletRequest request) {
+		return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+				.header(HttpHeaders.RETRY_AFTER, Integer.toString(exception.retryAfterSeconds()))
+				.contentType(MediaType.APPLICATION_PROBLEM_JSON)
+				.body(problem(
+						HttpStatus.TOO_MANY_REQUESTS,
+						"TOO_MANY_REQUESTS",
+						"Trop de demandes, réessayez plus tard",
+						request
+				));
 	}
 
 	@ExceptionHandler(DuplicatePhoneException.class)

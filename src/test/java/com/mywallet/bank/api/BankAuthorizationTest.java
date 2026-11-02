@@ -18,9 +18,12 @@ import com.mywallet.bank.application.port.in.ReactivateCustomerUseCase;
 import com.mywallet.bank.application.port.in.SearchAuditLogUseCase;
 import com.mywallet.bank.application.port.in.SearchCustomersUseCase;
 import com.mywallet.bank.application.port.in.SuspendCustomerUseCase;
+import com.mywallet.bank.application.port.in.ConfirmLinkUseCase;
+import com.mywallet.bank.application.port.in.InitiateLinkUseCase;
 import com.mywallet.bank.application.port.in.UnblockAccountUseCase;
-import com.mywallet.bank.application.port.in.VerifyLinkUseCase;
 import com.mywallet.bank.application.result.AccountView;
+import com.mywallet.bank.application.result.ConfirmLinkResult;
+import com.mywallet.bank.application.result.InitiateLinkResult;
 import com.mywallet.bank.application.result.AdminAccountView;
 import com.mywallet.bank.application.result.CustomerView;
 import com.mywallet.bank.application.result.OperationResult;
@@ -75,8 +78,11 @@ class BankAuthorizationTest {
 	private static final String DEPOSIT_BODY = """
 			{"amount":"10.00"}
 			""";
-	private static final String VERIFY_BODY = """
+	private static final String INITIATE_BODY = """
 			{"accountNumber":"123456789012","phone":"243810000001"}
+			""";
+	private static final String CONFIRM_BODY = """
+			{"linkId":"33333333-3333-3333-3333-333333333333","code":"123456"}
 			""";
 
 	@Autowired
@@ -95,7 +101,10 @@ class BankAuthorizationTest {
 	private GetAccountUseCase accounts;
 
 	@MockitoBean
-	private VerifyLinkUseCase links;
+	private InitiateLinkUseCase initiations;
+
+	@MockitoBean
+	private ConfirmLinkUseCase confirmations;
 
 	@MockitoBean
 	private CreateCustomerUseCase customers;
@@ -161,7 +170,8 @@ class BankAuthorizationTest {
 		lenient().when(credits.execute(any())).thenReturn(success);
 		lenient().when(operations.execute(any())).thenReturn(success);
 		lenient().when(accounts.execute(any())).thenReturn(accountView);
-		lenient().when(links.execute(any(), any())).thenReturn(true);
+		lenient().when(initiations.execute(any(), any())).thenReturn(new InitiateLinkResult(CUSTOMER_ID, 300));
+		lenient().when(confirmations.execute(any(), any())).thenReturn(new ConfirmLinkResult("123456789012"));
 		lenient().when(customers.execute(any())).thenReturn(customerView);
 		lenient().when(openings.execute(any())).thenReturn(accountView);
 		lenient().when(deposits.execute(any())).thenReturn(success);
@@ -210,7 +220,8 @@ class BankAuthorizationTest {
 				route("crédit", HttpMethod.POST, "/bank/operations/credit", DEBIT_BODY, 401, 200, 403, 403, 403),
 				route("lecture opération", HttpMethod.GET, "/bank/operations/ref-1", null, 401, 200, 200, 403, 403),
 				route("lecture compte", HttpMethod.GET, "/bank/accounts/123456789012", null, 401, 200, 200, 403, 403),
-				route("vérification liaison", HttpMethod.POST, "/bank/links/verify", VERIFY_BODY, 401, 200, 200, 403, 403),
+				route("initiation liaison", HttpMethod.POST, "/bank/links/initiate", INITIATE_BODY, 401, 202, 403, 403, 403),
+				route("confirmation liaison", HttpMethod.POST, "/bank/links/confirm", CONFIRM_BODY, 401, 200, 403, 403, 403),
 				route("recherche clients", HttpMethod.GET, "/bank/admin/customers", null, 401, 403, 403, 200, 200),
 				route("détail client", HttpMethod.GET, customer, null, 401, 403, 403, 200, 200),
 				route("comptes client", HttpMethod.GET, customer + "/accounts", null, 401, 403, 403, 200, 200),
